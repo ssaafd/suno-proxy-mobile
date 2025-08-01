@@ -1,1 +1,40 @@
 
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Suno Proxy</title>
+</head>
+<body style="font-family:sans-serif; padding:30px">
+  <h1>🎵 Génère ta musique (test Vercel)</h1>
+  <input id="prompt" placeholder="Paroles (ex: dancing at night)" style="width:300px" /><br><br>
+  <input id="style" placeholder="Style musical (ex: pop, reggae...)" style="width:300px" /><br><br>
+  <input id="title" placeholder="Titre de la musique" style="width:300px" /><br><br>
+  <button onclick="generate()">🎧 Générer</button>
+  <p id="result" style="margin-top:20px; white-space:pre-wrap;"></p>
+
+  <script>
+    async function generate() {
+      const result = document.getElementById("result");
+      result.innerText = "⏳ Génération en cours...";
+      try {
+        const res = await fetch('/api/generate-music', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: document.getElementById("prompt").value,
+            style: document.getElementById("style").value,
+            title: document.getElementById("title").value
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Erreur inconnue");
+        result.innerText = "✅ Task ID : " + data?.data?.taskId;
+      } catch (e) {
+        result.innerText = "❌ " + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
