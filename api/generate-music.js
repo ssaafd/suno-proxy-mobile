@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 
-// L'URL de l'API a été corrigée pour pointer vers l'endpoint utilisé par la communauté.
-const SUNO_API_URL = 'https://studio-api.suno.ai/api/generate'; 
+const SUNO_API_URL = 'https://api.sunoapi.org/api/v1/generate';
 const ALLOWED_SHOPIFY_ORIGIN = 'https://s164ub-mw.myshopify.com';
 
 module.exports = async (request, response) => {
@@ -18,23 +17,10 @@ module.exports = async (request, response) => {
   }
 
   try {
-    const { prompt } = request.body;
-    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-      return response.status(400).json({ error: 'Le paramètre "prompt" est manquant ou invalide.' });
-    }
-
     const apiKey = process.env.SUNO_API_KEY;
     if (!apiKey) {
-      console.error('Erreur critique : La variable d\'environnement SUNO_API_KEY est manquante.');
-      throw new Error("Erreur de configuration du serveur.");
+      throw new Error("Erreur de configuration: Clé API SUNO_API_KEY manquante sur Vercel.");
     }
-
-    const sunoPayload = {
-      prompt: prompt.trim(),
-      is_custom: false,
-      is_instrumental: false,
-      wait_audio: true,
-    };
 
     const sunoResponse = await fetch(SUNO_API_URL, {
       method: 'POST',
@@ -42,20 +28,22 @@ module.exports = async (request, response) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(sunoPayload),
+      body: JSON.stringify(request.body),
     });
 
     const responseData = await sunoResponse.json();
 
     if (!sunoResponse.ok) {
-      console.error("Réponse d'erreur de l'API Suno:", responseData);
-      throw new Error(responseData.detail || `L'API de Suno a retourné une erreur ${sunoResponse.status}.`);
+      const errorMessage = responseData.message || responseData.detail || `L'API de Suno a retourné une erreur ${sunoResponse.status}.`;
+      throw new Error(errorMessage);
     }
 
     return response.status(200).json(responseData);
 
   } catch (error) {
-    console.error('Erreur interne du proxy:', error.message);
-    return response.status(500).json({ error: error.message || 'Une erreur inattendue est survenue.' });
+    if (error instanceof SyntaxError) {
+        return response.status(500).json({ error: "L'API de Suno a renvoyé une réponse invalide (non-JSON)." });
+    }
+    return response.status(500).json({ error: error.message });
   }
 };
