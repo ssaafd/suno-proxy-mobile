@@ -1,0 +1,9 @@
+{
+  "name": "suno-proxy",
+  "version": "1.0.0",
+  "description": "Proxy for Suno API",
+  "main": "api/generate-music.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
