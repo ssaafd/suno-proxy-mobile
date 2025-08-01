@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 
-const SUNO_API_URL = 'https://api.sunoapi.org/api/v1/suno/generate';
+// L'URL de l'API a été corrigée pour pointer vers l'endpoint utilisé par la communauté.
+const SUNO_API_URL = 'https://studio-api.suno.ai/api/generate'; 
 const ALLOWED_SHOPIFY_ORIGIN = 'https://s164ub-mw.myshopify.com';
 
 module.exports = async (request, response) => {
