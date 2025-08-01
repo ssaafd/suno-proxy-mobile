@@ -1,48 +1,31 @@
-const SUNO_API_BASE_URL = 'https://api.sunoapi.org';
+// Vercel Serverless Function
 
-// Handler principal de la fonction Vercel
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    return handleStartGeneration(req, res);
-  } else if (req.method === 'GET') {
-    return handleCheckStatus(req, res);
-  } else {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-}
 
-// Démarre la génération et retourne un taskId
-async function handleStartGeneration(req, res) {
-  try {
-    const response = await fetch(`${SUNO_API_BASE_URL}/api/v1/generate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    if (response.status !== 200) throw new Error(data.msg);
-    return res.status(200).json({ taskId: data.data.taskId });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-}
+  const { prompt, style, title } = req.body;
 
-// Vérifie le statut d'une génération via son taskId
-async function handleCheckStatus(req, res) {
-  try {
-    const { taskId } = req.query;
-    if (!taskId) return res.status(400).json({ error: 'Task ID is required' });
+  const SUNO_API_KEY = process.env.SUNO_API_KEY;
 
-    const response = await fetch(`${SUNO_API_BASE_URL}/api/v1/generate/record-info?taskId=${taskId}`, {
-      headers: { 'Authorization': `Bearer ${process.env.SUNO_API_KEY}` },
-    });
-    const data = await response.json();
-    if (response.status !== 200) throw new Error(data.msg);
-    return res.status(200).json(data);
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
+  const response = await fetch('https://api.sunoapi.org/api/v1/generate', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUNO_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      prompt,
+      style,
+      title,
+      customMode: true,
+      instrumental: false,
+      model: 'V4_5',
+      callBackUrl: "" // à compléter si tu veux des callbacks
+    })
+  });
+
+  const data = await response.json();
+  return res.status(200).json(data);
 }
