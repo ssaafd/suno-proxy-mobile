@@ -1,68 +1,71 @@
 // Fichier : api/generate-music.js
-// Version finale utilisant la syntaxe CommonJS pour une compatibilité maximale.
+// Version finale avec autorisation CORS spécifique pour votre boutique.
+
+// Importation nécessaire pour utiliser fetch dans cet environnement
+const fetch = require('node-fetch');
 
 module.exports = async (request, response) => {
-  // Gérer la requête de vérification CORS (pre-flight)
-  // Cela autorise votre page Shopify à communiquer avec ce proxy.
-  response.setHeader('Access-Control-Allow-Origin', '*'); // Autorise toutes les origines
-  response.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // --- DÉBUT DE LA CONFIGURATION CORS ---
+  // On définit précisément quel site a le droit de nous appeler.
+  // D'après votre screenshot, l'adresse est : https://s164ub-mw.myshopify.com
+  const allowedOrigin = 'https://s164ub-mw.myshopify.com';
 
+  response.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Si le navigateur envoie une requête de vérification (OPTIONS), on répond OK.
   if (request.method === 'OPTIONS') {
-    response.status(200).end();
-    return;
+    return response.status(200).end();
   }
+  // --- FIN DE LA CONFIGURATION CORS ---
 
-  // S'assurer que la méthode est POST
+
+  // On s'assure que c'est bien une requête POST
   if (request.method !== 'POST') {
-    response.status(405).json({ error: 'Méthode non autorisée. Seule la méthode POST est acceptée.' });
-    return;
+    return response.status(405).json({ error: 'Méthode non autorisée.' });
   }
 
   try {
+    // On récupère le prompt envoyé depuis Shopify
     const { prompt } = request.body;
 
     if (!prompt) {
-      response.status(400).json({ error: 'La description (prompt) est manquante.' });
-      return;
+      return response.status(400).json({ error: 'La description (prompt) est manquante.' });
     }
 
-    // NOTE : Vérifiez la documentation officielle de Suno pour l'URL exacte de l'API.
-    const sunoApiUrl = 'https://api.suno.ai/v1/generate';
+    // On récupère la clé API secrète depuis les variables d'environnement de Vercel
     const apiKey = process.env.SUNO_API_KEY;
 
     if (!apiKey) {
-      // Cette erreur est levée si la clé API n'est pas configurée dans Vercel
+      // Cette erreur ne sera visible que dans les logs Vercel, c'est une sécurité.
       throw new Error("La clé API Suno (SUNO_API_KEY) n'est pas configurée sur Vercel.");
     }
 
-    const sunoResponse = await fetch(sunoApiUrl, {
+    // On appelle l'API de Suno
+    const sunoResponse = await fetch('https://api.suno.ai/v1/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        prompt: prompt,
-        // Autres paramètres éventuels ici
-      }),
+      body: JSON.stringify({ prompt: prompt }),
     });
 
     if (!sunoResponse.ok) {
       const errorText = await sunoResponse.text();
       console.error("Erreur de l'API Suno:", errorText);
-      // Transférer l'erreur de Suno au client
       throw new Error(`L'API de Suno a retourné une erreur: ${sunoResponse.statusText}`);
     }
 
     const musicData = await sunoResponse.json();
 
-    // Renvoyer la réponse de Suno au client (Shopify)
-    response.status(200).json(musicData);
+    // On renvoie la réponse de Suno à la page Shopify
+    return response.status(200).json(musicData);
 
   } catch (error) {
     console.error('Erreur interne du proxy:', error.message);
-    // Renvoyer un message d'erreur clair à Shopify
-    response.status(500).json({ error: error.message });
+    // On renvoie un message d'erreur clair à Shopify
+    return response.status(500).json({ error: error.message });
   }
 };
