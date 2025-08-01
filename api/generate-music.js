@@ -1,91 +1,88 @@
-// Contenu du fichier : api/generate-music.js
+// Fichier : api/generate-music.js
 
-export default async function handler(request, response) {
-  // Liste des adresses qui ont le droit d'utiliser votre API
-  const allowedOrigins = [
-    // Votre adresse de boutique en ligne
-    'https://s164ub-mw.myshopify.com',
-    // L'ancienne adresse de prévisualisation (au cas où)
-    'https://qj2ls3fvu8igkzlj-93046800727.shopifypreview.com'
-  ];
+// Définir la configuration pour Vercel pour qu'il gère bien la requête
+export const config = {
+  runtime: 'edge',
+};
 
-  const origin = request.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    response.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    return response.status(403).json({ error: 'Accès non autorisé' });
-  }
+export default async function handler(request) {
 
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  // Gérer la requête de vérification CORS (pre-flight)
   if (request.method === 'OPTIONS') {
-    return response.status(200).end();
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*', // Autorise toutes les origines pour la simplicité
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
   }
 
-  const { prompt } = request.body;
-
-  if (!prompt) {
-    return response.status(400).json({ error: 'La description (prompt) est manquante.' });
+  // S'assurer que la méthode est POST
+  if (request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Méthode non autorisée' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-
-  // NOTE : Vérifiez la documentation officielle de Suno pour l'URL exacte de l'API.
-  const sunoApiUrl = 'https://api.suno.ai/v1/generate'; 
 
   try {
+    const { prompt } = await request.json();
+
+    if (!prompt) {
+      return new Response(JSON.stringify({ error: 'La description (prompt) est manquante.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // NOTE : Vérifiez la documentation officielle de Suno pour l'URL exacte de l'API.
+    const sunoApiUrl = 'https://api.suno.ai/v1/generate';
+    const apiKey = process.env.SUNO_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("La clé API Suno n'est pas configurée sur Vercel.");
+    }
+
     const sunoResponse = await fetch(sunoApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}` 
+        'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ prompt: prompt })
+      body: JSON.stringify({
+        prompt: prompt,
+        // Autres paramètres éventuels ici
+      }),
     });
 
     if (!sunoResponse.ok) {
       const errorText = await sunoResponse.text();
       console.error("Erreur de l'API Suno:", errorText);
-      return response.status(sunoResponse.status).json({ error: "L'API de Suno a retourné une erreur." });
+      throw new Error("L'API de Suno a retourné une erreur.");
     }
 
     const musicData = await sunoResponse.json();
-    response.status(200).json(musicData);
 
-  } catch (error) {
-    console.error('Erreur interne du proxy:', error);
-    response.status(500).json({ error: 'Erreur lors de la communication avec l\'API Suno.' });
-  }
-}
-  const { prompt } = request.body;
-
-  if (!prompt) {
-    return response.status(400).json({ error: 'La description (prompt) est manquante.' });
-  }
-
-  const sunoApiUrl = 'https://api.suno.ai/v1/generate'; 
-
-  try {
-    const sunoResponse = await fetch(sunoApiUrl, {
-      method: 'POST',
+    // Renvoyer la réponse de Suno au client (Shopify)
+    return new Response(JSON.stringify(musicData), {
+      status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}` 
+        'Access-Control-Allow-Origin': '*', // Autorise toutes les origines
       },
-      body: JSON.stringify({
-        prompt: prompt,
-      })
     });
 
-    if (!sunoResponse.ok) {
-      console.error("Erreur de l'API Suno:", await sunoResponse.text());
-      return response.status(sunoResponse.status).json({ error: "L'API de Suno a retourné une erreur." });
-    }
-
-    const musicData = await sunoResponse.json();
-    response.status(200).json(musicData);
-
   } catch (error) {
-    console.error('Erreur interne du proxy:', error);
-    response.status(500).json({ error: 'Erreur lors de la communication avec l\'API Suno.' });
+    console.error('Erreur interne du proxy:', error.message);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500, // Erreur interne du serveur
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*', // Autorise toutes les origines
+      },
+    });
   }
 }
+
