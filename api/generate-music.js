@@ -1,36 +1,38 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
-  const { title, description, tags } = req.body;
+  const { title, prompt, tags } = req.body;
 
-  if (!process.env.SUNO_API_KEY) {
-    return res.status(500).json({ error: 'API key not set' });
+  if (!title || !prompt || !tags) {
+    return res.status(400).json({ error: 'Champs manquants' });
   }
 
   try {
-    const response = await fetch('https://studio-api.suno.ai/api/generate', {
+    const response = await fetch('https://studio-api.suno.ai/api/generate/v2/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}`
+        Authorization: `Bearer ${process.env.SUNO_API_KEY}`,
       },
       body: JSON.stringify({
-        title,
-        description,
-        tags: tags || ''
-      })
+        title: title,
+        prompt: prompt,
+        tags: tags,
+      }),
     });
 
-    const data = await response.json();
+    const result = await response.json();
 
     if (!response.ok) {
-      return res.status(500).json({ error: 'API error', details: data });
+      console.error('Erreur Suno:', result);
+      return res.status(response.status).json(result);
     }
 
-    res.status(200).json({ taskId: data.id || data.task_id || 'unknown' });
+    res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Server error', details: error.message });
+    console.error('Erreur serveur:', error);
+    res.status(500).json({ error: 'Erreur serveur interne' });
   }
 }
