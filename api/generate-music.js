@@ -1,38 +1,43 @@
+// /api/generate-music.js
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    return res.status(200).end();
-  }
+  // Autorise les requêtes CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { title, prompt, tags, instrumental } = req.body;
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Méthode non autorisée" });
+  }
 
   try {
-    const sunoRes = await fetch('https://api.suno.ai/api/v1/generate/music', {
-      method: 'POST',
+    const { prompt, title, tags, instrumental } = req.body;
+
+    const sunoResponse = await fetch("https://api.sunoapi.org/api/v1/generate/music", {
+      method: "POST",
       headers: {
-        'Authorization': 'Bearer caa204a1f65a2762cc234531c1d28e74',
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
+        "Authorization": "Bearer caa204a1f65a2762cc234531c1d28e74" // Ta clé test ici
       },
       body: JSON.stringify({
-        title,
         prompt,
+        title,
         tags,
-        model: 'chirp-v3-5',
-        instrumental
+        instrumental,
+        model: "chirp-v3-5",
+        customMode: true
       })
     });
 
-    const data = await sunoRes.json();
-    res.status(200).json({ task_id: data?.data?.taskId || null });
+    const data = await sunoResponse.json();
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!data?.data?.taskId) {
+      return res.status(500).json({ error: "Erreur API", details: data });
+    }
+
+    res.status(200).json({ task_id: data.data.taskId });
+  } catch (error) {
+    res.status(500).json({ error: "Erreur serveur", details: error.message });
   }
 }
