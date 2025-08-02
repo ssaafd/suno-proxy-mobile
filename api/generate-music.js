@@ -1,36 +1,35 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { title, prompt, tags } = req.body;
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: 'Missing prompt' });
+  }
 
   try {
-    const response = await fetch("https://studio-api.suno.ai/api/v1/generate/v2/", {
+    const response = await fetch('https://api.suno.ai/api/v1/generate/', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.SUNO_API_KEY}`,
+        'Authorization': `Bearer ${process.env.SUNO_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        title,
         prompt,
-        tags,
         make_instrumental: false,
-        continue_at: null,
-        mv: "chirp-v3-5",
-        callbackUrl: `${process.env.CALLBACK_URL}/api/callback`
+        wait_audio: false
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data.msg || 'Erreur génération' });
+      return res.status(response.status).json({ error: data?.msg || 'Generation error' });
     }
 
-    return res.status(200).json({ task_id: data.task_id });
+    res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 }
