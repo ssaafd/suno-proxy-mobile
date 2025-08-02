@@ -1,105 +1,134 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Suno API Full Test</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎵 Générateur Musical Suno</title>
   <style>
     body {
-      background: linear-gradient(145deg, #f7f5f0, #e1ece8);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-image: url('https://images.unsplash.com/photo-1517423440428-a5a00ad493e8');
-      background-size: cover;
-      background-position: center;
-    }
-    .glass {
-      backdrop-filter: blur(10px);
-      background: rgba(255, 255, 255, 0.6);
-      border-radius: 1rem;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(120deg, #e0f7fa, #ffffff);
       padding: 2rem;
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      max-width: 700px;
+      margin: auto;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      padding: 0.7rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #0070f3;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button.loading {
+      opacity: 0.6;
+      cursor: wait;
+    }
+    .result {
+      margin-top: 2rem;
+    }
+    audio, video {
+      width: 100%;
+      margin-top: 1rem;
     }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center">
-  <div class="glass max-w-2xl w-full space-y-6">
-    <h1 class="text-2xl font-bold text-center text-gray-800">🌿 Suno API All-In-One Music Dashboard</h1><label class="block font-semibold">🎼 Title</label>
-<input id="title" class="w-full border p-2 rounded" value="Mystic Flute Ceremony" />
+<body>
 
-<label class="block font-semibold">🧠 Prompt</label>
-<textarea id="prompt" class="w-full border p-2 rounded" rows="2">shamanic flute ambient tribal mystic</textarea>
+  <h1>🎧 Générateur Musical Suno</h1>
 
-<label class="block font-semibold">🏷️ Tags</label>
-<input id="tags" class="w-full border p-2 rounded" value="shamanic, tribal, ambient" />
+  <input id="title" value="Mystic Ceremony" placeholder="Titre">
+  <textarea id="prompt" rows="2">shamanic flute ambient tribal mystic</textarea>
+  <input id="tags" value="shamanic, tribal, ambient" placeholder="Tags séparés par virgule">
+  <label><input type="checkbox" id="instrumental" checked> Instrumental</label>
+  <button id="generateBtn">Générer la musique</button>
 
-<label class="flex items-center space-x-2">
-  <input id="instrumental" type="checkbox" checked />
-  <span>Instrumental only</span>
-</label>
+  <div id="status"></div>
 
-<button onclick="generateMusic()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full">Generate Music</button>
+  <div class="result" id="resultBlock" style="display: none;">
+    <h2>🎶 Résultat</h2>
+    <p id="titleResult"></p>
+    <audio controls id="audioPlayer"></audio>
+    <img id="coverImage" style="max-width: 100%; margin-top: 1rem;" />
+    <video controls id="videoPlayer" style="display:none;"></video>
+    <a id="downloadLink" download style="display:block; margin-top:1rem;">⬇️ Télécharger MP3</a>
+  </div>
 
-<div id="status" class="text-sm text-gray-600 mt-4">⏳ Status: Waiting for input...</div>
-<audio id="player" controls class="w-full hidden mt-4"></audio>
+  <script>
+    const btn = document.getElementById("generateBtn");
+    const status = document.getElementById("status");
+    const resultBlock = document.getElementById("resultBlock");
 
-<div class="space-y-2">
-  <button onclick="convertWav()" class="bg-blue-600 text-white px-4 py-1 rounded w-full">🔁 Convert to WAV</button>
-  <button onclick="boostTrack()" class="bg-purple-600 text-white px-4 py-1 rounded w-full">⚡ Boost Style</button>
-  <button onclick="splitStems()" class="bg-yellow-500 text-white px-4 py-1 rounded w-full">🎚 Separate Stems</button>
-  <button onclick="generateVideo()" class="bg-red-500 text-white px-4 py-1 rounded w-full">🎥 Generate Music Video</button>
-</div>
+    btn.onclick = async () => {
+      btn.classList.add("loading");
+      btn.disabled = true;
+      status.innerText = "🎶 Génération en cours...";
+      resultBlock.style.display = "none";
 
-  </div>  <script>
-    let taskId = null;
-    let audioId = null;
+      const title = document.getElementById("title").value;
+      const prompt = document.getElementById("prompt").value;
+      const tags = document.getElementById("tags").value;
+      const instrumental = document.getElementById("instrumental").checked;
 
-    async function generateMusic() {
-      document.getElementById('status').textContent = '🎶 Sending generation request...';
-
-      const res = await axios.post('/api/generate', {
-        title: document.getElementById('title').value,
-        prompt: document.getElementById('prompt').value,
-        tags: document.getElementById('tags').value,
-        instrumental: document.getElementById('instrumental').checked
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, prompt, tags, instrumental })
       });
 
-      taskId = res.data.task_id;
-      pollStatus(taskId);
-    }
+      const data = await res.json();
+      const taskId = data.task_id;
+      if (!taskId) {
+        status.innerText = "❌ Erreur lors de la création";
+        btn.classList.remove("loading");
+        btn.disabled = false;
+        return;
+      }
 
-    async function pollStatus(id) {
-      document.getElementById('status').textContent = '⏳ Waiting for Suno to generate...';
+      poll(taskId);
+    };
+
+    async function poll(taskId) {
+      let attempts = 0;
       const interval = setInterval(async () => {
-        const res = await axios.get(`/api/status/${id}`);
-        if (res.data.status === 'complete') {
+        const res = await fetch(`/api/info/${taskId}`);
+        const data = await res.json();
+
+        if (data && data.status === "SUCCESS" && data.response?.sunoData?.length) {
           clearInterval(interval);
-          document.getElementById('status').textContent = '✅ Music ready!';
-          document.getElementById('player').src = res.data.audio_url;
-          document.getElementById('player').classList.remove('hidden');
-          audioId = res.data.audio_id;
+          const track = data.response.sunoData[0];
+          document.getElementById("titleResult").innerText = track.title;
+          document.getElementById("audioPlayer").src = track.audioUrl;
+          document.getElementById("coverImage").src = track.imageUrl;
+          document.getElementById("downloadLink").href = track.audioUrl;
+          document.getElementById("resultBlock").style.display = "block";
+
+          if (track.streamAudioUrl?.endsWith(".mp4")) {
+            const video = document.getElementById("videoPlayer");
+            video.src = track.streamAudioUrl;
+            video.style.display = "block";
+          }
+
+          status.innerText = "✅ Génération terminée";
+          btn.classList.remove("loading");
+          btn.disabled = false;
+        }
+
+        if (++attempts > 20) {
+          clearInterval(interval);
+          status.innerText = "⏱️ Délai dépassé. Essayez encore.";
+          btn.classList.remove("loading");
+          btn.disabled = false;
         }
       }, 5000);
     }
+  </script>
 
-    async function convertWav() {
-      const res = await axios.post('/api/wav', { task_id: taskId, audio_id: audioId });
-      alert('✅ WAV version is ready. (Backend needs to return the link.)');
-    }
-
-    async function boostTrack() {
-      const res = await axios.post('/api/boost', { task_id: taskId, audio_id: audioId });
-      alert('✅ Track boosted.');
-    }
-
-    async function splitStems() {
-      const res = await axios.post('/api/stems', { task_id: taskId, audio_id: audioId });
-      alert('✅ Stems separated.');
-    }
-
-    async function generateVideo() {
-      const res = await axios.post('/api/video', { task_id: taskId, audio_id: audioId });
-      alert('✅ Video generated.');
-    }
-  </script></body>
+</body>
 </html>
