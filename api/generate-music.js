@@ -1,50 +1,41 @@
-// api/generate-music.js (version compatible Vercel CommonJS)
-
-module.exports = async function (req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
   }
-
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
 
   const { prompt, style, title } = req.body;
 
   if (!prompt || !style || !title) {
-    return res.status(400).json({ error: 'Champs requis manquants' });
+    return res.status(400).json({ error: 'Champs manquants' });
   }
 
   try {
-    const response = await fetch('https://api.sunoapi.org/api/v1/generate', {
-      method: 'POST',
+    const sunoResponse = await fetch("https://studio-api.suno.ai/api/generate/v2/", {
+      method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.SUNO_API_KEY}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.SUNO_API_KEY}`
       },
       body: JSON.stringify({
         prompt,
         style,
         title,
-        customMode: true,
-        instrumental: false,
-        model: 'V4_5',
-        callBackUrl: '',
-      }),
+        mv: "chirp-v3-0", 
+        continue_clip_id: null,
+        make_instrumental: false,
+        num_generations: 1
+      })
     });
 
-    const data = await response.json();
+    const result = await sunoResponse.json();
 
-    if (!response.ok || !data?.data?.taskId) {
-      console.error('Erreur API Suno:', data);
-      return res.status(response.status || 500).json({ error: data?.msg || 'Erreur Suno inconnue' });
+    if (!result || !result[0] || !result[0].uuid) {
+      return res.status(500).json({ error: 'Réponse Suno invalide', raw: result });
     }
 
-    res.status(200).json(data);
-  } catch (err) {
-    console.error('Erreur serveur interne:', err);
-    res.status(500).json({ error: 'Erreur serveur interne', details: err.message });
+    return res.status(200).json({ task_id: result[0].uuid });
+
+  } catch (error) {
+    return res.status(500).json({ error: "Erreur serveur", details: error.message });
   }
-};
+}
