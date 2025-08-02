@@ -1,22 +1,28 @@
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
 
   const { taskId } = req.query;
-  if (!taskId) return res.status(400).json({ error: 'Missing taskId' });
+  if (!taskId) return res.status(400).json({ error: 'taskId requis' });
 
   try {
-    const response = await fetch(`https://api.sunoapi.org/api/v1/generate/record-info?taskId=${taskId}`, {
+    const result = await fetch(`https://studio-api.suno.ai/api/v1/generate/record-info?taskId=${taskId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${process.env.SUNO_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
     });
 
-    const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data?.msg || 'Status error' });
-    res.status(200).json(data);
+    const json = await result.json();
+
+    if (!result.ok) {
+      return res.status(result.status).json({ error: json.msg || 'Erreur check status' });
+    }
+
+    return res.status(200).json(json.data);
   } catch (err) {
-    res.status(500).json({ error: 'Server error', details: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
