@@ -1,100 +1,101 @@
-<!DOCTYPE html>
-<html lang="fr">
+<!DOCTYPE html><html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Test Suno</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Générateur Suno - Test</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 2rem;
-      background: linear-gradient(to right, #e0f7fa, #fff);
+      background: #0e0e0e;
+      color: #fff;
     }
-    input, textarea, button {
+    label, input, textarea {
       display: block;
-      margin-top: 1rem;
-      padding: 0.8rem;
-      font-size: 1rem;
+      margin: 0.5rem 0;
       width: 100%;
     }
-    audio {
-      margin-top: 2rem;
-      width: 100%;
+    input, textarea {
+      padding: 0.5rem;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      color: white;
     }
-    .loader {
+    button {
       margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      background-color: #00ffa1;
+      color: #000;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    audio, video {
+      margin-top: 1rem;
+      width: 100%;
     }
   </style>
 </head>
 <body>
+  <h1>🎵 Test Générateur Suno 🎵</h1><label>Titre</label> <input type="text" id="title" value="Mystic Ceremony">
 
-  <h1>🎵 Test Générateur Suno</h1>
+<label>Prompt</label>
 
-  <input id="title" placeholder="Titre" value="Mystic Flute Ceremony" />
-  <textarea id="prompt" rows="4">shamanic flute ambient tribal mystic</textarea>
-  <input id="tags" value="shamanic, tribal, ambient" />
-  <label>
-    <input type="checkbox" id="instrumental" checked />
-    Instrumental
-  </label>
-  <button id="generate">Générer la musique</button>
+  <textarea id="prompt">shamanic flute ambient tribal mystic</textarea><label>Tags</label> <input type="text" id="tags" value="shamanic, tribal, ambient">
 
-  <div class="loader" id="loader" style="display:none;">⏳ En attente...</div>
-  <div id="result" style="display:none;">
-    <p>🎧 Résultat :</p>
-    <audio controls id="player"></audio>
-  </div>
+<label><input type="checkbox" id="instrumental" checked> Instrumental</label>
 
-  <script>
-    const generateBtn = document.getElementById("generate");
-    const loader = document.getElementById("loader");
-    const result = document.getElementById("result");
-    const player = document.getElementById("player");
+<button onclick="generateMusic()">Générer</button>
 
-    generateBtn.onclick = async () => {
-      loader.style.display = "block";
-      result.style.display = "none";
-      player.src = "";
+  <div id="loading"></div>
+  <audio id="player" controls style="display:none"></audio>
+  <video id="videoPlayer" controls style="display:none"></video>  <script>
+    const SUNO_API_KEY = 'caa204a1f65a2762cc234531c1d28e74'; // clé visible pour test uniquement
 
-      const title = document.getElementById("title").value;
-      const prompt = document.getElementById("prompt").value;
-      const tags = document.getElementById("tags").value;
-      const instrumental = document.getElementById("instrumental").checked;
+    async function generateMusic() {
+      document.getElementById("loading").innerText = "Génération en cours...";
+      document.getElementById("player").style.display = "none";
+      document.getElementById("videoPlayer").style.display = "none";
 
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/generate-music", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, prompt, tags, instrumental })
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: document.getElementById("title").value,
+          prompt: document.getElementById("prompt").value,
+          tags: document.getElementById("tags").value,
+          instrumental: document.getElementById("instrumental").checked
+        })
       });
 
       const data = await res.json();
-      if (!data.task_id) {
-        alert("Erreur : tâche non créée");
-        loader.style.display = "none";
-        return;
-      }
+      if (!data.task_id) return alert("Erreur API : pas de tâche créée.");
+      pollStatus(data.task_id);
+    }
 
-      const taskId = data.task_id;
-      pollStatus(taskId);
-    };
-
-    const pollStatus = async (taskId) => {
+    async function pollStatus(taskId) {
       const interval = setInterval(async () => {
         const res = await fetch(`/api/status/${taskId}`);
         const data = await res.json();
-        if (data.status === "complete" && data.audio_url) {
-          clearInterval(interval);
-          loader.style.display = "none";
-          player.src = data.audio_url;
-          result.style.display = "block";
-        } else if (data.status === "failed") {
-          clearInterval(interval);
-          loader.style.display = "none";
-          alert("Erreur pendant la génération");
-        }
-      }, 4000);
-    };
-  </script>
 
-</body>
+        if (data.status === "complete") {
+          clearInterval(interval);
+          document.getElementById("loading").innerText = "Génération terminée ✅";
+          if (data.audio_url) {
+            const player = document.getElementById("player");
+            player.src = data.audio_url;
+            player.style.display = "block";
+            player.play();
+          }
+          if (data.video_url) {
+            const video = document.getElementById("videoPlayer");
+            video.src = data.video_url;
+            video.style.display = "block";
+          }
+        }
+      }, 5000);
+    }
+  </script></body>
 </html>
