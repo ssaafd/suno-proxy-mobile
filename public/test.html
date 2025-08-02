@@ -1,20 +1,126 @@
-<script>
-  async function lancerGeneration() {
-    const title = document.querySelector('input').value;
-    const tags = document.querySelector('textarea').value;
+<!DOCTYPE html><html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🎵 Générateur Suno Studio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');body {
+  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+  color: #f0f0f0;
+  font-family: 'Roboto', sans-serif;
+  text-align: center;
+  padding: 40px;
+}
+h1 {
+  font-size: 32px;
+  margin-bottom: 20px;
+  color: #f9db6d;
+  text-shadow: 1px 1px 4px #000;
+}
+input, textarea {
+  width: 90%;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  backdrop-filter: blur(5px);
+}
+button {
+  padding: 12px 30px;
+  font-size: 18px;
+  border: none;
+  background-color: #a9d420;
+  color: #000;
+  border-radius: 30px;
+  cursor: pointer;
+  margin-top: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+button:hover {
+  background-color: #c5ef3f;
+}
+.spinner {
+  display: none;
+  margin-top: 20px;
+}
+.spinner.active {
+  display: inline-block;
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255,255,255,0.3);
+  border-top-color: #a9d420;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+#result {
+  margin-top: 20px;
+  font-size: 16px;
+}
+a {
+  color: #f9db6d;
+  font-weight: bold;
+  text-decoration: none;
+}
 
-    const response = await fetch('/api/generate-music', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, tags })
-    });
+  </style>
+</head>
+<body>
+  <h1>🎵 Studio Suno Shaman Reggae 🌿</h1>  <input id="title" placeholder="Titre de la musique (ex: Mystic Ceremony)">
+  <br>
+  <textarea id="tags" placeholder="Tags (ex: shamanic flute, ambient tribal, reggae roots)"></textarea>
+  <br>
+  <button onclick="lancerGeneration()">Lancer la Génération</button>
+  <div id="spinner" class="spinner"></div>
+  <p id="result"></p>  <script>
+    async function lancerGeneration() {
+      const title = document.getElementById("title").value.trim();
+      const tags = document.getElementById("tags").value.trim();
+      const result = document.getElementById("result");
+      const spinner = document.getElementById("spinner");
 
-    const data = await response.json();
+      if (!title || !tags) {
+        result.innerText = "⚠️ Veuillez remplir tous les champs";
+        return;
+      }
 
-    if (!response.ok) {
-      alert(`Erreur API : ${data.error}`);
-    } else {
-      alert(`Tâche créée : ${data.taskId}`);
+      result.innerText = "";
+      spinner.classList.add("active");
+
+      const res = await fetch("/api/generate-music", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, tags })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.taskId) {
+        spinner.classList.remove("active");
+        result.innerText = `❌ Erreur : ${data.error || 'Tâche non créée'}`;
+        return;
+      }
+
+      // Polling
+      const taskId = data.taskId;
+      result.innerText = `⌛ Tâche en cours (#${taskId})...`;
+      const interval = setInterval(async () => {
+        const statusRes = await fetch(`/api/status/${taskId}`);
+        const statusData = await statusRes.json();
+
+        if (statusData.status === "done") {
+          clearInterval(interval);
+          spinner.classList.remove("active");
+          result.innerHTML = `✅ Musique disponible : <a href="${statusData.audio_url}" target="_blank">▶️ Écouter</a>`;
+        } else if (statusData.status === "error") {
+          clearInterval(interval);
+          spinner.classList.remove("active");
+          result.innerText = `❌ Erreur lors de la génération`;
+        }
+      }, 3000);
     }
-  }
-</script>
+  </script></body>
+</html>
