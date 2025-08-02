@@ -2,133 +2,105 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎵 Générateur Musical Suno</title>
+  <title>Test Suno API</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(120deg, #e0f7fa, #ffffff);
+      font-family: sans-serif;
+      background: #f4f6f9;
       padding: 2rem;
-      max-width: 700px;
+      max-width: 600px;
       margin: auto;
     }
     input, textarea, button {
       width: 100%;
-      margin-top: 0.5rem;
-      margin-bottom: 1rem;
-      padding: 0.7rem;
-      border-radius: 5px;
-      border: 1px solid #ccc;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
     }
     button {
-      background: #0070f3;
+      background: #222;
       color: white;
-      font-weight: bold;
+      border: none;
       cursor: pointer;
     }
-    button.loading {
-      opacity: 0.6;
-      cursor: wait;
-    }
-    .result {
-      margin-top: 2rem;
-    }
-    audio, video {
+    audio {
+      margin-top: 20px;
       width: 100%;
-      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
+  <h1>🎵 Test Suno API (clé visible)</h1>
 
-  <h1>🎧 Générateur Musical Suno</h1>
+  <input id="title" placeholder="Titre" value="Mystic Flute Ceremony">
+  <textarea id="prompt">shamanic flute ambient tribal mystic</textarea>
+  <input id="tags" value="shamanic, tribal, ambient">
 
-  <input id="title" value="Mystic Ceremony" placeholder="Titre">
-  <textarea id="prompt" rows="2">shamanic flute ambient tribal mystic</textarea>
-  <input id="tags" value="shamanic, tribal, ambient" placeholder="Tags séparés par virgule">
-  <label><input type="checkbox" id="instrumental" checked> Instrumental</label>
-  <button id="generateBtn">Générer la musique</button>
+  <button onclick="generate()">🎼 Générer la musique</button>
 
-  <div id="status"></div>
-
-  <div class="result" id="resultBlock" style="display: none;">
-    <h2>🎶 Résultat</h2>
-    <p id="titleResult"></p>
-    <audio controls id="audioPlayer"></audio>
-    <img id="coverImage" style="max-width: 100%; margin-top: 1rem;" />
-    <video controls id="videoPlayer" style="display:none;"></video>
-    <a id="downloadLink" download style="display:block; margin-top:1rem;">⬇️ Télécharger MP3</a>
-  </div>
+  <p id="status"></p>
+  <audio id="player" controls style="display:none;"></audio>
 
   <script>
-    const btn = document.getElementById("generateBtn");
-    const status = document.getElementById("status");
-    const resultBlock = document.getElementById("resultBlock");
+    const SUNO_API_KEY = "caa204a1f65a2762cc234531c1d28e74"; // Clé directement ici
 
-    btn.onclick = async () => {
-      btn.classList.add("loading");
-      btn.disabled = true;
-      status.innerText = "🎶 Génération en cours...";
-      resultBlock.style.display = "none";
-
+    async function generate() {
       const title = document.getElementById("title").value;
       const prompt = document.getElementById("prompt").value;
       const tags = document.getElementById("tags").value;
-      const instrumental = document.getElementById("instrumental").checked;
+      const status = document.getElementById("status");
+      const player = document.getElementById("player");
 
-      const res = await fetch("/api/generate", {
+      status.textContent = "⏳ En cours...";
+      player.style.display = "none";
+
+      const response = await fetch("https://api.sunoapi.org/api/v1/generate/music", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, prompt, tags, instrumental })
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + SUNO_API_KEY
+        },
+        body: JSON.stringify({
+          title: title,
+          prompt: prompt,
+          tags: tags,
+          model: "chirp-v3-5",
+          instrumental: true
+        })
       });
 
-      const data = await res.json();
-      const taskId = data.task_id;
+      const data = await response.json();
+      const taskId = data?.data?.taskId;
       if (!taskId) {
-        status.innerText = "❌ Erreur lors de la création";
-        btn.classList.remove("loading");
-        btn.disabled = false;
+        status.textContent = "❌ Erreur : aucune tâche reçue";
         return;
       }
 
-      poll(taskId);
-    };
+      pollStatus(taskId);
+    }
 
-    async function poll(taskId) {
-      let attempts = 0;
+    async function pollStatus(taskId) {
+      const status = document.getElementById("status");
+      const player = document.getElementById("player");
+
       const interval = setInterval(async () => {
-        const res = await fetch(`/api/info/${taskId}`);
-        const data = await res.json();
-
-        if (data && data.status === "SUCCESS" && data.response?.sunoData?.length) {
-          clearInterval(interval);
-          const track = data.response.sunoData[0];
-          document.getElementById("titleResult").innerText = track.title;
-          document.getElementById("audioPlayer").src = track.audioUrl;
-          document.getElementById("coverImage").src = track.imageUrl;
-          document.getElementById("downloadLink").href = track.audioUrl;
-          document.getElementById("resultBlock").style.display = "block";
-
-          if (track.streamAudioUrl?.endsWith(".mp4")) {
-            const video = document.getElementById("videoPlayer");
-            video.src = track.streamAudioUrl;
-            video.style.display = "block";
+        const res = await fetch(`https://api.sunoapi.org/api/v1/generate/record-info?taskId=${taskId}`, {
+          headers: {
+            "Authorization": "Bearer " + SUNO_API_KEY
           }
+        });
 
-          status.innerText = "✅ Génération terminée";
-          btn.classList.remove("loading");
-          btn.disabled = false;
-        }
+        const data = await res.json();
+        const song = data?.data?.response?.sunoData?.[0];
 
-        if (++attempts > 20) {
+        if (data?.data?.status === "SUCCESS" && song?.audioUrl) {
           clearInterval(interval);
-          status.innerText = "⏱️ Délai dépassé. Essayez encore.";
-          btn.classList.remove("loading");
-          btn.disabled = false;
+          status.textContent = "✅ Terminé ! Écoute ci-dessous :";
+          player.src = song.audioUrl;
+          player.style.display = "block";
         }
-      }, 5000);
+      }, 4000);
     }
   </script>
-
 </body>
 </html>
