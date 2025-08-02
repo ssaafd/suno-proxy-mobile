@@ -1,9 +1,8 @@
 {
-  "name": "suno-proxy",
+  "name": "suno-proxy-mobile",
   "version": "1.0.0",
-  "description": "Proxy for Suno API",
-  "main": "api/generate-music.js",
-  "dependencies": {
-    "node-fetch": "^2.6.7"
+  "type": "module",
+  "scripts": {
+    "start": "vercel dev"
   }
 }
