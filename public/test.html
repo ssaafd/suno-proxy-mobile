@@ -1,65 +1,92 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Suno Proxy</title>
+  <title>🎵 Générateur Suno API - Test</title>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 2em;
-      background: #111;
-      color: #eee;
-    }
-    input, button {
-      padding: 10px;
-      margin: 5px 0;
-      width: 100%;
-    }
-    #loading {
-      display: none;
-    }
+    body { font-family: sans-serif; padding: 2rem; background: #f7f7f7; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
+    input, textarea, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 6px; border: 1px solid #ccc; }
+    audio { width: 100%; margin-top: 20px; }
+    .status { font-size: 0.9rem; color: #555; }
   </style>
 </head>
 <body>
-  <h2>Suno Proxy Generator</h2>
-  <form id="musicForm">
-    <input type="text" id="prompt" value="Shamanic flute ceremony Mystic" placeholder="Enter your prompt">
-    <button type="submit">Generate</button>
-  </form>
-  <div id="loading">🎶 Generating music...</div>
-  <audio id="audio" controls style="display:none; margin-top:20px;"></audio>
 
-  <script>
-    const form = document.getElementById('musicForm');
-    const loading = document.getElementById('loading');
-    const audio = document.getElementById('audio');
+<div class="card">
+  <h2>🎶 Test Générateur Suno</h2>
+  <input id="title" value="Mystic Flute Ritual" placeholder="Titre">
+  <textarea id="prompt">shamanic flute ceremony mystic</textarea>
+  <input id="tags" value="ambient, tribal, shamanic" placeholder="Tags">
+  <button onclick="generate()">Générer la musique</button>
+  <p class="status" id="status">En attente...</p>
+  <audio id="player" controls style="display:none;"></audio>
+</div>
 
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const prompt = document.getElementById('prompt').value;
-      loading.style.display = 'block';
-      audio.style.display = 'none';
+<script>
+  const API_KEY = "caa204a1f65a2762cc234531c1d28e74"; // Remplace après test
+  const GEN_URL = "https://api.sunoapi.org/api/v1/generate";
+  const CHECK_URL = "https://api.sunoapi.org/api/v1/generate/record-info?taskId=";
 
-      const res = await fetch('/api/generate-music', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
+  async function generate() {
+    const prompt = document.getElementById("prompt").value;
+    const title = document.getElementById("title").value;
+    const tags = document.getElementById("tags").value;
+    const status = document.getElementById("status");
+    const player = document.getElementById("player");
 
-      const { task_id } = await res.json();
-      if (!task_id) return alert("Error: No task ID");
+    status.textContent = "Envoi de la requête à Suno...";
+    player.style.display = "none";
 
-      const poll = setInterval(async () => {
-        const r = await fetch(`/api/suno-status?taskId=${task_id}`);
-        const data = await r.json();
-        if (data.audio_url) {
-          clearInterval(poll);
-          loading.style.display = 'none';
-          audio.src = data.audio_url;
-          audio.style.display = 'block';
-        }
-      }, 3000);
+    const res = await fetch(GEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt,
+        title,
+        tags,
+        make_instrumental: true,
+        customMode: true,
+        model: "chirp-v3-5"
+      })
+    });
+
+    const data = await res.json();
+    if (!data.data?.taskId) {
+      status.textContent = "Erreur : " + (data.msg || "inconnue");
+      return;
     }
-  </script>
+
+    const taskId = data.data.taskId;
+    status.textContent = "Génération lancée. Attente du résultat...";
+
+    let tries = 0;
+    const interval = setInterval(async () => {
+      const check = await fetch(CHECK_URL + taskId, {
+        headers: { Authorization: `Bearer ${API_KEY}` }
+      });
+      const result = await check.json();
+      tries++;
+
+      if (result?.data?.status === "SUCCESS") {
+        clearInterval(interval);
+        const url = result.data.response.sunoData[0].audioUrl;
+        player.src = url;
+        player.style.display = "block";
+        player.play();
+        status.textContent = "✅ Génération terminée.";
+      } else if (tries > 30) {
+        clearInterval(interval);
+        status.textContent = "❌ Timeout (30 tentatives).";
+      } else {
+        status.textContent = `⏳ Attente... (${tries})`;
+      }
+    }, 5000);
+  }
+</script>
+
 </body>
 </html>
