@@ -1,41 +1,105 @@
-// src/app/page.tsx 'use client';
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suno API Full Test</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(145deg, #f7f5f0, #e1ece8);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-image: url('https://images.unsplash.com/photo-1517423440428-a5a00ad493e8');
+      background-size: cover;
+      background-position: center;
+    }
+    .glass {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+  <div class="glass max-w-2xl w-full space-y-6">
+    <h1 class="text-2xl font-bold text-center text-gray-800">🌿 Suno API All-In-One Music Dashboard</h1><label class="block font-semibold">🎼 Title</label>
+<input id="title" class="w-full border p-2 rounded" value="Mystic Flute Ceremony" />
 
-import { useState } from 'react'; import { Button } from "@/components/ui/button"; import { Input } from "@/components/ui/input"; import { Textarea } from "@/components/ui/textarea"; import { Card, CardContent } from "@/components/ui/card"; import { Loader2, Music } from "lucide-react"; import { motion } from 'framer-motion';
+<label class="block font-semibold">🧠 Prompt</label>
+<textarea id="prompt" class="w-full border p-2 rounded" rows="2">shamanic flute ambient tribal mystic</textarea>
 
-export default function Page() { const [title, setTitle] = useState("Mystic Flute Ceremony"); const [prompt, setPrompt] = useState("shamanic flute ambient tribal mystic"); const [tags, setTags] = useState("shamanic, tribal, ambient"); const [isInstrumental, setIsInstrumental] = useState(true); const [loading, setLoading] = useState(false); const [taskId, setTaskId] = useState<string | null>(null); const [audioUrl, setAudioUrl] = useState<string | null>(null);
+<label class="block font-semibold">🏷️ Tags</label>
+<input id="tags" class="w-full border p-2 rounded" value="shamanic, tribal, ambient" />
 
-const generateMusic = async () => { setLoading(true); setAudioUrl(null);
+<label class="flex items-center space-x-2">
+  <input id="instrumental" type="checkbox" checked />
+  <span>Instrumental only</span>
+</label>
 
-const res = await fetch("/api/generate", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ title, prompt, tags, instrumental: isInstrumental })
-});
+<button onclick="generateMusic()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full">Generate Music</button>
 
-const data = await res.json();
-if (!data.task_id) return alert("Erreur : tâche non créée");
+<div id="status" class="text-sm text-gray-600 mt-4">⏳ Status: Waiting for input...</div>
+<audio id="player" controls class="w-full hidden mt-4"></audio>
 
-setTaskId(data.task_id);
-pollStatus(data.task_id);
-
-};
-
-const pollStatus = async (id: string) => { const interval = setInterval(async () => { const res = await fetch(/api/status/${id}); const data = await res.json(); if (data.status === 'complete') { clearInterval(interval); setAudioUrl(data.audio_url); setLoading(false); } }, 5000); };
-
-return ( <div className="min-h-screen bg-gradient-to-br from-white to-blue-100 p-4"> <motion.div className="max-w-xl mx-auto mt-8 space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}> <h1 className="text-3xl font-bold text-center flex items-center gap-2 justify-center"> <Music className="w-6 h-6" /> Test Générateur Suno </h1> <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} /> <Textarea placeholder="Prompt musical" value={prompt} onChange={(e) => setPrompt(e.target.value)} /> <Input placeholder="Tags" value={tags} onChange={(e) => setTags(e.target.value)} /> <div className="flex items-center space-x-2"> <input type="checkbox" checked={isInstrumental} onChange={() => setIsInstrumental(!isInstrumental)} /> <label>Instrumental</label> </div> <Button className="w-full" onClick={generateMusic} disabled={loading}> {loading ? (<><Loader2 className="animate-spin mr-2 h-4 w-4" /> Génération...</>) : "Générer la musique"} </Button>
-
-{audioUrl && (
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <p className="font-semibold">🎧 Résultat :</p>
-          <audio controls className="w-full">
-            <source src={audioUrl} type="audio/mpeg" />
-          </audio>
-        </CardContent>
-      </Card>
-    )}
-  </motion.div>
+<div class="space-y-2">
+  <button onclick="convertWav()" class="bg-blue-600 text-white px-4 py-1 rounded w-full">🔁 Convert to WAV</button>
+  <button onclick="boostTrack()" class="bg-purple-600 text-white px-4 py-1 rounded w-full">⚡ Boost Style</button>
+  <button onclick="splitStems()" class="bg-yellow-500 text-white px-4 py-1 rounded w-full">🎚 Separate Stems</button>
+  <button onclick="generateVideo()" class="bg-red-500 text-white px-4 py-1 rounded w-full">🎥 Generate Music Video</button>
 </div>
 
-); }
+  </div>  <script>
+    let taskId = null;
+    let audioId = null;
 
+    async function generateMusic() {
+      document.getElementById('status').textContent = '🎶 Sending generation request...';
+
+      const res = await axios.post('/api/generate', {
+        title: document.getElementById('title').value,
+        prompt: document.getElementById('prompt').value,
+        tags: document.getElementById('tags').value,
+        instrumental: document.getElementById('instrumental').checked
+      });
+
+      taskId = res.data.task_id;
+      pollStatus(taskId);
+    }
+
+    async function pollStatus(id) {
+      document.getElementById('status').textContent = '⏳ Waiting for Suno to generate...';
+      const interval = setInterval(async () => {
+        const res = await axios.get(`/api/status/${id}`);
+        if (res.data.status === 'complete') {
+          clearInterval(interval);
+          document.getElementById('status').textContent = '✅ Music ready!';
+          document.getElementById('player').src = res.data.audio_url;
+          document.getElementById('player').classList.remove('hidden');
+          audioId = res.data.audio_id;
+        }
+      }, 5000);
+    }
+
+    async function convertWav() {
+      const res = await axios.post('/api/wav', { task_id: taskId, audio_id: audioId });
+      alert('✅ WAV version is ready. (Backend needs to return the link.)');
+    }
+
+    async function boostTrack() {
+      const res = await axios.post('/api/boost', { task_id: taskId, audio_id: audioId });
+      alert('✅ Track boosted.');
+    }
+
+    async function splitStems() {
+      const res = await axios.post('/api/stems', { task_id: taskId, audio_id: audioId });
+      alert('✅ Stems separated.');
+    }
+
+    async function generateVideo() {
+      const res = await axios.post('/api/video', { task_id: taskId, audio_id: audioId });
+      alert('✅ Video generated.');
+    }
+  </script></body>
+</html>
