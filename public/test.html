@@ -1,73 +1,50 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Test Générateur Suno</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 2rem; max-width:600px; margin:auto; }
-    input, textarea, button { width:100%; margin:0.5rem 0; padding:0.8rem; }
-    button { background:#0070f3; color:#fff; border:none; cursor:pointer; }
-    .loader { margin-top:1rem; color:#555; }
-    audio { margin-top:1rem; width:100%; }
-    img { margin-top:1rem; max-width:100%; }
-  </style>
+  <meta charset="UTF-8">
+  <title>🎵 Test Générateur Suno 🎵</title>
 </head>
-<body>
-  <h1>🎶 Test Générateur Suno</h1>
-  <input id="title" placeholder="Titre" value="Mystic Ceremony">
-  <textarea id="prompt">shamanic flute ambient tribal mystic</textarea>
-  <button id="generate">Générer la musique</button>
-  <div class="loader" id="loader"></div>
-  <img id="cover" style="display:none;">
-  <audio controls id="player" style="display:none;"></audio>
+<body style="background:#111; color:#eee; font-family:sans-serif; padding:20px;">
+  <h1>🎵 Test Générateur Suno 🎵</h1>
+  <input id="title" placeholder="Titre" value="Mystic Ceremony" /><br><br>
+  <textarea id="prompt" placeholder="Prompt">shamanic flute ambient tribal mystic</textarea><br><br>
+  <button onclick="generate()">Lancer</button>
+  <div id="result" style="margin-top:20px;"></div>
 
-<script>
-  document.getElementById('generate').onclick = async () => {
-    const title = document.getElementById('title').value;
-    const prompt = document.getElementById('prompt').value;
-    const loader = document.getElementById('loader');
-    const player = document.getElementById('player');
-    const cover = document.getElementById('cover');
+  <script>
+    async function generate() {
+      const title = document.getElementById('title').value;
+      const prompt = document.getElementById('prompt').value;
 
-    loader.textContent = '⏳ Génération en cours…';
-    player.style.display = 'none';
-    cover.style.display = 'none';
+      const res = await fetch('/api/generate-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, prompt })
+      });
 
-    const res = await fetch('/api/generate-music', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, prompt })
-    });
+      const data = await res.json();
+      if (!res.ok) return alert('Erreur API: ' + (data?.error || 'Inconnue'));
 
-    const data = await res.json();
-    if (!data.task_id) {
-      loader.textContent = '❌ ' + (data.error || 'Erreur génération');
-      console.error('generate error', data);
-      return;
-    }
+      const taskId = data?.taskIds?.[0];
+      if (!taskId) return alert('Erreur : aucune tâche créée.');
 
-    const taskId = data.task_id;
-    const poll = setInterval(async () => {
-      const st = await fetch(`/api/status/${taskId}`);
-      const info = await st.json();
-      console.log('status info', info);
+      document.getElementById('result').innerText = 'Tâche en cours : ' + taskId;
 
-      if (info.status === 'SUCCESS' && info.audio_url) {
-        clearInterval(poll);
-        loader.textContent = '✅ Génération terminée';
-        player.src = info.audio_url;
-        player.style.display = 'block';
-        if (info.cover_url) {
-          cover.src = info.cover_url;
-          cover.style.display = 'block';
+      // Polling
+      const interval = setInterval(async () => {
+        const statusRes = await fetch('/api/check-task?taskId=' + taskId);
+        const statusData = await statusRes.json();
+
+        if (statusData.audio_url) {
+          clearInterval(interval);
+          document.getElementById('result').innerHTML = `
+            ✅ Généré !<br>
+            <audio controls src="${statusData.audio_url}"></audio><br>
+            <a href="${statusData.audio_url}" download>Télécharger</a>
+          `;
         }
-      } else if (info.status === 'FAILED') {
-        clearInterval(poll);
-        loader.textContent = '❌ Échec sur génération';
-      }
-    }, 4000);
-  };
-</script>
-
+      }, 5000);
+    }
+  </script>
 </body>
 </html>
