@@ -1,42 +1,36 @@
-console.log("SUNO_API_KEY:", process.env.SUNO_API_KEY ? '✓ OK' : '⛔ Manquante');export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Methode non autorisée' });
-
-  const { prompt, title } = req.body;
-  if (!prompt || !title) return res.status(400).json({ error: 'prompt et title sont requis' });
+  const { title, prompt } = req.body;
+  const apiKey = process.env.SUNO_API_KEY;
 
   try {
-    const response = await fetch('https://api.sunoapi.org/api/v1/generate/music', {
+    const response = await fetch('https://api.sunoapi.org/api/v1/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SUNO_API_KEY}`
+        Authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         prompt,
         title,
-        tags: [],
+        model: "v3",           // ou "v3_5"
+        customMode: true,
         instrumental: false,
-        model: 'chirp-v3-5',
-        customMode: true
+        tags: []
       })
     });
 
-    const data = await response.json();
-    console.log('Suno API generate response:', data);
-
-    if (!data?.data?.taskId) {
-      return res.status(500).json({ error: 'Erreur Suno, pas de taskId', raw: data });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).json({ error: 'Erreur API', details: errText });
     }
 
-    res.status(200).json({ task_id: data.data.taskId });
-  } catch (err) {
-    console.error('generate-music error', err);
-    res.status(500).json({ error: 'Erreur interne', details: err.message });
+    const data = await response.json();
+    res.status(200).json(data); // contient taskId, etc.
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
