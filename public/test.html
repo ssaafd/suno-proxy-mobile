@@ -1,38 +1,139 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Test Suno Proxy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Shamanique – Générateur Suno</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(to bottom, #1b1b1b, #000);
+      color: #fdfdfd;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #ffb3ec;
+    }
+    input, button {
+      width: 100%;
+      padding: 1rem;
+      margin-top: 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+    }
+    input {
+      background: #222;
+      color: white;
+    }
+    button {
+      background-color: #ff69b4;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #ff85c1;
+    }
+    audio {
+      margin-top: 2rem;
+      width: 100%;
+    }
+    .loader {
+      margin-top: 1rem;
+      border: 4px solid #444;
+      border-top: 4px solid #ff69b4;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      display: none;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    pre {
+      background: #111;
+      padding: 1rem;
+      color: #ccc;
+      white-space: pre-wrap;
+    }
+  </style>
 </head>
-<body style="font-family:sans-serif; padding:30px">
-  <h1>🎵 Génère ta musique (test Vercel)</h1>
-  <input id="prompt" placeholder="Paroles (ex: dancing at night)" style="width:300px" /><br><br>
-  <input id="style" placeholder="Style musical (ex: pop, reggae...)" style="width:300px" /><br><br>
-  <input id="title" placeholder="Titre de la musique" style="width:300px" /><br><br>
-  <button onclick="generate()">🎧 Générer</button>
-  <p id="result" style="margin-top:20px; white-space:pre-wrap;"></p>
+<body>
+  <h1>🌿 Générateur Suno – Ambiance Shamanique</h1>
+
+  <input type="text" id="title" value="Shamanique" placeholder="Titre..." />
+  <input type="text" id="prompt" value="flûte amérindienne" placeholder="Prompt..." />
+  <input type="text" id="tags" value="cérémonie mystic" placeholder="Tags..." />
+  <button onclick="generate()">🎶 Lancer la Génération</button>
+
+  <div class="loader" id="loader"></div>
+  <pre id="result"></pre>
+  <audio id="player" controls style="display:none;"></audio>
 
   <script>
+    let pollingInterval;
+
     async function generate() {
-      const result = document.getElementById("result");
-      result.innerText = "⏳ Génération en cours...";
+      const title = document.getElementById('title').value;
+      const prompt = document.getElementById('prompt').value;
+      const tags = document.getElementById('tags').value;
+
+      document.getElementById('result').innerText = "⏳ Demande envoyée...";
+      document.getElementById('player').style.display = 'none';
+      document.getElementById('loader').style.display = 'block';
+
       try {
         const res = await fetch('/api/generate-music', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: document.getElementById("prompt").value,
-            style: document.getElementById("style").value,
-            title: document.getElementById("title").value
-          })
+          body: JSON.stringify({ title, prompt, tags })
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Erreur inconnue");
-        result.innerText = "✅ Task ID : " + data?.data?.taskId;
-      } catch (e) {
-        result.innerText = "❌ " + e.message;
+
+        if (!res.ok || !data.task_id) {
+          throw new Error(data.error || "Erreur lors de la génération.");
+        }
+
+        document.getElementById('result').innerText = `🌀 En attente de Suno (taskId: ${data.task_id})`;
+
+        // Start polling
+        pollingInterval = setInterval(() => checkStatus(data.task_id), 3000);
+
+      } catch (err) {
+        document.getElementById('result').innerText = "❌ " + err.message;
+        document.getElementById('loader').style.display = 'none';
+      }
+    }
+
+    async function checkStatus(taskId) {
+      try {
+        const res = await fetch(`/api/check-status?taskId=${taskId}`);
+        const data = await res.json();
+
+        if (data.status === "SUCCESS" && data.response?.sunoData?.[0]?.audioUrl) {
+          clearInterval(pollingInterval);
+
+          const url = data.response.sunoData[0].audioUrl;
+          document.getElementById('result').innerText = "✅ Génération terminée !";
+          const player = document.getElementById('player');
+          player.src = url;
+          player.style.display = 'block';
+          player.play();
+          document.getElementById('loader').style.display = 'none';
+        } else {
+          console.log("⏳ Attente...");
+        }
+      } catch (err) {
+        clearInterval(pollingInterval);
+        document.getElementById('result').innerText = "❌ Erreur de vérification : " + err.message;
+        document.getElementById('loader').style.display = 'none';
       }
     }
   </script>
